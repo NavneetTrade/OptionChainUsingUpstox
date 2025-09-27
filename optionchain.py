@@ -22,14 +22,32 @@ except ImportError:
 def get_credentials():
     """Get pre-configured developer credentials"""
     try:
-        return {
-            'access_token': st.secrets.upstox.access_token,
-            'api_key': st.secrets.upstox.api_key,
-            'api_secret': st.secrets.upstox.api_secret,
-            'redirect_uri': st.secrets.upstox.redirect_uri
-        }
+        # First try reading directly from st.secrets
+        try:
+            credentials = {
+                'access_token': st.secrets["upstox"]["access_token"],
+                'api_key': st.secrets["upstox"]["api_key"],
+                'api_secret': st.secrets["upstox"]["api_secret"],
+                'redirect_uri': st.secrets["upstox"]["redirect_uri"]
+            }
+            return credentials
+        except KeyError:
+            # If the above fails, try the alternative format
+            return {
+                'access_token': st.secrets.upstox.access_token,
+                'api_key': st.secrets.upstox.api_key,
+                'api_secret': st.secrets.upstox.api_secret,
+                'redirect_uri': st.secrets.upstox.redirect_uri
+            }
     except Exception as e:
-        st.error(f"Error loading credentials: {str(e)}")
+        # Log more detailed error information
+        if not hasattr(st, 'secrets'):
+            st.error("st.secrets is not available. Make sure you're running this with streamlit run")
+        elif 'upstox' not in st.secrets:
+            st.error("'upstox' section not found in secrets.toml")
+            st.write("Current sections in secrets:", list(st.secrets.keys()) if hasattr(st.secrets, 'keys') else "None")
+        else:
+            st.error(f"Error loading credentials: {str(e)}")
         return None
 
 # Upstox API endpoints
@@ -507,11 +525,37 @@ def main():
         
     # Get pre-configured developer credentials
     try:
+        # Check if .streamlit/secrets.toml exists
+        secrets_path = os.path.join(os.path.dirname(__file__), '.streamlit', 'secrets.toml')
+        if not os.path.exists(secrets_path):
+            st.error("secrets.toml file not found!")
+            st.info(f"Expected location: {secrets_path}")
+            st.info("Please create the file with your Upstox credentials")
+            return
+            
         credentials = get_credentials()
         if not credentials:
-            st.error("Could not load credentials from secrets.toml")
-            st.info("Please check if your .streamlit/secrets.toml file exists and has the correct format")
+            st.error("Failed to load credentials from secrets.toml")
+            st.info("""
+            Your secrets.toml should look like this:
+            ```toml
+            [upstox]
+            access_token="your_token"
+            api_key="your_api_key"
+            api_secret="your_secret"
+            redirect_uri="your_uri"
+            ```
+            Make sure there are no spaces around the = signs
+            """)
             return
+            
+        # Verify all required fields are present
+        required_fields = ['access_token', 'api_key', 'api_secret', 'redirect_uri']
+        missing_fields = [field for field in required_fields if not credentials.get(field)]
+        if missing_fields:
+            st.error(f"Missing required fields in secrets.toml: {', '.join(missing_fields)}")
+            return
+            
     except Exception as e:
         st.error(f"Error accessing credentials: {str(e)}")
         st.info("Please verify that your secrets.toml file is properly formatted")
