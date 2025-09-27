@@ -518,6 +518,13 @@ def setup_page():
     """, unsafe_allow_html=True)
 
 def main():
+    # Set wide layout for the entire app
+    st.set_page_config(
+        page_title="Enhanced Upstox F&O Option Chain Dashboard",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+    
     setup_page()
     
     st.title("Enhanced Upstox F&O Option Chain Dashboard")
@@ -1148,17 +1155,20 @@ def create_option_chain_visualization(table, spot_price, symbol):
     st.header("OI, ChgOI & Volume Distribution")
     
     # Set better default style
-    plt.rcParams['figure.figsize'] = [20, 10]
-    plt.rcParams['figure.dpi'] = 100
-    plt.rcParams['axes.grid'] = True
-    plt.rcParams['grid.alpha'] = 0.3
-    plt.rcParams['axes.labelsize'] = 12
-    plt.rcParams['xtick.labelsize'] = 10
-    plt.rcParams['ytick.labelsize'] = 10
+    plt.style.use('default')  # Reset to default style
+    plt.rcParams.update({
+        'figure.figsize': [16, 8],  # Adjusted for better fit in wide layout
+        'figure.dpi': 100,
+        'axes.grid': True,
+        'grid.alpha': 0.3,
+        'axes.labelsize': 12,
+        'xtick.labelsize': 10,
+        'ytick.labelsize': 10,
+        'figure.autolayout': True  # Enable automatic layout adjustments
+    })
     
-    # Create figure with larger size and better spacing
+    # Create figure with better spacing
     fig, ax1 = plt.subplots()
-    plt.subplots_adjust(bottom=0.15)  # Add more space at bottom for labels
     
     indices = np.arange(len(table))
     bar_width = 0.2
@@ -1191,7 +1201,26 @@ def create_option_chain_visualization(table, spot_price, symbol):
     ax1.set_title(f"{symbol} Option Chain Distribution")
     ax1.grid(True, alpha=0.3)
     plt.tight_layout()
-    st.pyplot(fig)
+    
+    # Use full width container for the plot
+    with st.container():
+        # Add CSS to ensure full width
+        st.markdown("""
+            <style>
+            .element-container {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            .stPlotlyChart, .stplot {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            </style>
+        """, unsafe_allow_html=True)
+        
+        # Display plot in full width
+        st.pyplot(fig, use_container_width=True)
+    
     plt.close()
 
 def calculate_bucket_summaries(table, atm_strike, spot_price):
