@@ -19,28 +19,15 @@ try:
 except ImportError:
     AUTORFR = False
 
-def get_developer_token():
-    """Get the pre-configured developer token"""
-    try:
-        if hasattr(st.secrets, 'upstox') and hasattr(st.secrets.upstox, 'access_token'):
-            return st.secrets.upstox.access_token
-        return None
-    except Exception:
-        return None
-
 def get_credentials():
     """Get pre-configured developer credentials"""
     try:
-        # Always use the developer's pre-configured credentials
-        token = get_developer_token()
-        if token:
-            return {
-                'access_token': token,
-                'api_key': st.secrets.upstox.api_key if hasattr(st.secrets, 'upstox') else "e9df887e-56aa-445e-b826-122bea0a3851",
-                'api_secret': st.secrets.upstox.api_secret if hasattr(st.secrets, 'upstox') else "i96hmi6nqd",
-                'redirect_uri': st.secrets.upstox.redirect_uri if hasattr(st.secrets, 'upstox') else "http://localhost:8501/oauth2callback"
-            }
-        return None
+        return {
+            'access_token': st.secrets.upstox.access_token,
+            'api_key': st.secrets.upstox.api_key,
+            'api_secret': st.secrets.upstox.api_secret,
+            'redirect_uri': st.secrets.upstox.redirect_uri
+        }
     except Exception as e:
         st.error(f"Error loading credentials: {str(e)}")
         return None
@@ -519,19 +506,15 @@ def main():
         st.session_state.option_chain_data = None
         
     # Get pre-configured developer credentials
-    credentials = get_credentials()
-    if not credentials:
-        st.error("Developer credentials not configured. Please add credentials in Streamlit secrets.")
-        st.info("""
-        Add the following to your .streamlit/secrets.toml:
-        ```toml
-        [upstox]
-        access_token = "your_permanent_access_token"
-        api_key = "your_api_key"
-        api_secret = "your_api_secret"
-        redirect_uri = "your_redirect_uri"
-        ```
-        """)
+    try:
+        credentials = get_credentials()
+        if not credentials:
+            st.error("Could not load credentials from secrets.toml")
+            st.info("Please check if your .streamlit/secrets.toml file exists and has the correct format")
+            return
+    except Exception as e:
+        st.error(f"Error accessing credentials: {str(e)}")
+        st.info("Please verify that your secrets.toml file is properly formatted")
         return
     
     # Set the pre-configured access token
