@@ -23,16 +23,32 @@ def is_cloud():
     """Check if we're running on Streamlit Cloud"""
     return os.getenv('STREAMLIT_RUNTIME') == 'cloud'
 
+def get_stored_token():
+    """Get stored token from session state or secrets"""
+    if 'access_token' in st.session_state:
+        return st.session_state.access_token
+    if is_cloud() and hasattr(st.secrets, 'upstox') and hasattr(st.secrets.upstox, 'access_token'):
+        return st.secrets.upstox.access_token
+    return None
+
+def store_token(token):
+    """Store token in session state"""
+    st.session_state.access_token = token
+
 def get_credentials():
     """Get credentials based on environment"""
     try:
         if is_cloud():
             # Running on Streamlit Cloud - use secrets
-            return {
+            creds = {
                 'api_key': st.secrets.upstox.api_key,
                 'api_secret': st.secrets.upstox.api_secret,
                 'redirect_uri': st.secrets.upstox.redirect_uri
             }
+            # If we have a stored token in secrets, use it
+            if hasattr(st.secrets.upstox, 'access_token'):
+                creds['access_token'] = st.secrets.upstox.access_token
+            return creds
         else:
             # Running locally - use default development credentials
             return {
@@ -518,15 +534,38 @@ def main():
         st.session_state.last_data_update = None
     if 'option_chain_data' not in st.session_state:
         st.session_state.option_chain_data = None
+        
+    # Get credentials and try to restore session
+    credentials = get_credentials()
+    if not credentials:
+        st.error("Failed to load credentials. Please check your configuration.")
+        return
+        
+    # Try to restore existing token
+    stored_token = get_stored_token()
+    if stored_token:
+        st.session_state.upstox_api.access_token = stored_token
+        # Validate the token
+        profile_data, error = st.session_state.upstox_api.get_profile()
+        if not profile_data:
+            st.session_state.upstox_api.access_token = None
+            stored_token = None
     
     # Sidebar for API configuration
     with st.sidebar:
         st.header("API Configuration")
         
-        # API credentials
-        api_key = st.text_input("API Key", value="e9df887e-56aa-445e-b826-122bea0a3851", type="password")
-        api_secret = st.text_input("API Secret", value="i96hmi6nqd", type="password")
-        redirect_uri = st.text_input("Redirect URI", value="http://localhost:8501/oauth2callback")
+        if is_cloud():
+            # In cloud, use stored credentials
+            api_key = credentials['api_key']
+            api_secret = credentials['api_secret']
+            redirect_uri = credentials['redirect_uri']
+            st.info("Using configured cloud credentials")
+        else:
+            # Locally, allow credential override
+            api_key = st.text_input("API Key", value=credentials['api_key'], type="password")
+            api_secret = st.text_input("API Secret", value=credentials['api_secret'], type="password")
+            redirect_uri = st.text_input("Redirect URI", value=credentials['redirect_uri'])
         
         # Analysis settings
         st.subheader("Analysis Settings")
@@ -758,7 +797,39 @@ def main():
     
     else:
         with main_content_container:
-            st.info("Please get your access token first to start fetching data")
+            if is_cloud():
+                st.error("Token not available or expired. Please check your secrets.toml configuration.")
+                st.info("Make sure you have added the access_token in your Streamlit Cloud secrets.")
+                st.markdown("""
+                To configure your secrets in Streamlit Cloud:
+                1. Go to your app settings
+                2. Navigate to the Secrets section
+                3. Add your Upstox credentials in this format:
+                ```toml
+                [upstox]
+                api_key = "your_api_key"
+                api_secret = "your_api_secret"
+                redirect_uri = "your_redirect_uri"
+                access_token = "your_access_token"
+                ```
+                """)
+            else:
+                auth_url = st.session_state.upstox_api.get_auth_url(api_key, redirect_uri)
+                st.markdown(f"[Click here to authorize]({auth_url})")
+                
+                auth_code = st.text_input("Enter the authorization code:")
+                if auth_code:
+                    success, token_data = st.session_state.upstox_api.get_access_token(
+                        auth_code, api_key, api_secret, redirect_uri
+                    )
+                    if success:
+                        st.session_state.token_data = token_data
+                        st.session_state.upstox_api.access_token = token_data.get('access_token')
+                        store_token(token_data.get('access_token'))
+                        st.success("Successfully authenticated!")
+                        st.experimental_rerun()
+                    else:
+                        st.error(f"Authentication failed: {token_data}")
             
             st.markdown("""
             ### Setup Guide:
