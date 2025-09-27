@@ -19,6 +19,20 @@ try:
 except ImportError:
     AUTORFR = False
 
+# Set up Indian timezone
+IST = pytz.timezone('Asia/Kolkata')
+def get_ist_now():
+    """Get current time in IST"""
+    return datetime.now(IST)
+
+def format_ist_time(dt):
+    """Format datetime in IST with AM/PM"""
+    if dt.tzinfo is None:
+        dt = IST.localize(dt)
+    elif dt.tzinfo != IST:
+        dt = dt.astimezone(IST)
+    return dt.strftime('%I:%M:%S %p')
+
 def get_credentials():
     """Get pre-configured developer credentials"""
     try:
@@ -784,7 +798,7 @@ def main():
                 
                 with col_fetch2:
                     if st.session_state.last_data_update:
-                        st.info(f"Last updated: {st.session_state.last_data_update}")
+                        st.info(f"Last updated: {st.session_state.last_data_update} IST")
             
             # FIXED: Display data in the same container - no separate placeholder needed
             if st.session_state.option_chain_data:
@@ -897,8 +911,9 @@ def fetch_and_display_option_chain(instrument_key, symbol, expiry, itm_count, ri
         
         if option_data and error is None and 'data' in option_data:
             st.session_state.option_chain_data = option_data['data']
-            st.session_state.last_data_update = datetime.now().strftime('%H:%M:%S')
-            st.success(f"Data fetched successfully at {st.session_state.last_data_update}")
+            current_time = get_ist_now()
+            st.session_state.last_data_update = format_ist_time(current_time)
+            st.success(f"Data fetched successfully at {st.session_state.last_data_update} IST")
             # UI will automatically update through the session state
         else:
             st.error(f"Failed to fetch option chain: {error}")
@@ -1130,9 +1145,14 @@ def process_option_chain_data(data, spot_price):
 # All the visualization and analysis functions from the original code
 def create_option_chain_visualization(table, spot_price, symbol):
     """Create visualization for option chain data"""
-    st.subheader("OI, ChgOI & Volume Distribution")
+    st.header("OI, ChgOI & Volume Distribution")
     
-    fig, ax1 = plt.subplots(figsize=(14, 6))
+    # Set style for better visibility
+    plt.style.use('seaborn')
+    
+    # Create figure with larger size and better spacing
+    fig, ax1 = plt.subplots(figsize=(20, 10))
+    plt.subplots_adjust(bottom=0.15)  # Add more space at bottom for labels
     
     indices = np.arange(len(table))
     bar_width = 0.2
