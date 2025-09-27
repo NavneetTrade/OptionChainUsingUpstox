@@ -1147,11 +1147,17 @@ def create_option_chain_visualization(table, spot_price, symbol):
     """Create visualization for option chain data"""
     st.header("OI, ChgOI & Volume Distribution")
     
-    # Set style for better visibility
-    plt.style.use('seaborn')
+    # Set better default style
+    plt.rcParams['figure.figsize'] = [20, 10]
+    plt.rcParams['figure.dpi'] = 100
+    plt.rcParams['axes.grid'] = True
+    plt.rcParams['grid.alpha'] = 0.3
+    plt.rcParams['axes.labelsize'] = 12
+    plt.rcParams['xtick.labelsize'] = 10
+    plt.rcParams['ytick.labelsize'] = 10
     
     # Create figure with larger size and better spacing
-    fig, ax1 = plt.subplots(figsize=(20, 10))
+    fig, ax1 = plt.subplots()
     plt.subplots_adjust(bottom=0.15)  # Add more space at bottom for labels
     
     indices = np.arange(len(table))
