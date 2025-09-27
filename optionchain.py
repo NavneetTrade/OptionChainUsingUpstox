@@ -19,43 +19,28 @@ try:
 except ImportError:
     AUTORFR = False
 
-def is_cloud():
-    """Check if we're running on Streamlit Cloud"""
-    return os.getenv('STREAMLIT_RUNTIME') == 'cloud'
-
-def get_stored_token():
-    """Get stored token from session state or secrets"""
-    if 'access_token' in st.session_state:
-        return st.session_state.access_token
-    if is_cloud() and hasattr(st.secrets, 'upstox') and hasattr(st.secrets.upstox, 'access_token'):
-        return st.secrets.upstox.access_token
-    return None
-
-def store_token(token):
-    """Store token in session state"""
-    st.session_state.access_token = token
+def get_developer_token():
+    """Get the pre-configured developer token"""
+    try:
+        if hasattr(st.secrets, 'upstox') and hasattr(st.secrets.upstox, 'access_token'):
+            return st.secrets.upstox.access_token
+        return None
+    except Exception:
+        return None
 
 def get_credentials():
-    """Get credentials based on environment"""
+    """Get pre-configured developer credentials"""
     try:
-        if is_cloud():
-            # Running on Streamlit Cloud - use secrets
-            creds = {
-                'api_key': st.secrets.upstox.api_key,
-                'api_secret': st.secrets.upstox.api_secret,
-                'redirect_uri': st.secrets.upstox.redirect_uri
-            }
-            # If we have a stored token in secrets, use it
-            if hasattr(st.secrets.upstox, 'access_token'):
-                creds['access_token'] = st.secrets.upstox.access_token
-            return creds
-        else:
-            # Running locally - use default development credentials
+        # Always use the developer's pre-configured credentials
+        token = get_developer_token()
+        if token:
             return {
-                'api_key': "e9df887e-56aa-445e-b826-122bea0a3851",
-                'api_secret': "i96hmi6nqd",
-                'redirect_uri': "http://localhost:8501/oauth2callback"
+                'access_token': token,
+                'api_key': st.secrets.upstox.api_key if hasattr(st.secrets, 'upstox') else "e9df887e-56aa-445e-b826-122bea0a3851",
+                'api_secret': st.secrets.upstox.api_secret if hasattr(st.secrets, 'upstox') else "i96hmi6nqd",
+                'redirect_uri': st.secrets.upstox.redirect_uri if hasattr(st.secrets, 'upstox') else "http://localhost:8501/oauth2callback"
             }
+        return None
     except Exception as e:
         st.error(f"Error loading credentials: {str(e)}")
         return None
@@ -522,8 +507,6 @@ def main():
     # Initialize session state
     if 'upstox_api' not in st.session_state:
         st.session_state.upstox_api = UpstoxAPI()
-    if 'token_data' not in st.session_state:
-        st.session_state.token_data = None
     if 'selected_symbol' not in st.session_state:
         st.session_state.selected_symbol = "NIFTY"
     if 'selected_expiry' not in st.session_state:
@@ -535,37 +518,34 @@ def main():
     if 'option_chain_data' not in st.session_state:
         st.session_state.option_chain_data = None
         
-    # Get credentials and try to restore session
+    # Get pre-configured developer credentials
     credentials = get_credentials()
     if not credentials:
-        st.error("Failed to load credentials. Please check your configuration.")
+        st.error("Developer credentials not configured. Please add credentials in Streamlit secrets.")
+        st.info("""
+        Add the following to your .streamlit/secrets.toml:
+        ```toml
+        [upstox]
+        access_token = "your_permanent_access_token"
+        api_key = "your_api_key"
+        api_secret = "your_api_secret"
+        redirect_uri = "your_redirect_uri"
+        ```
+        """)
         return
-        
-    # Try to restore existing token
-    stored_token = get_stored_token()
-    if stored_token:
-        st.session_state.upstox_api.access_token = stored_token
-        # Validate the token
-        profile_data, error = st.session_state.upstox_api.get_profile()
-        if not profile_data:
-            st.session_state.upstox_api.access_token = None
-            stored_token = None
+    
+    # Set the pre-configured access token
+    st.session_state.upstox_api.access_token = credentials['access_token']
     
     # Sidebar for API configuration
     with st.sidebar:
         st.header("API Configuration")
+        st.info("Using pre-configured developer credentials")
         
-        if is_cloud():
-            # In cloud, use stored credentials
-            api_key = credentials['api_key']
-            api_secret = credentials['api_secret']
-            redirect_uri = credentials['redirect_uri']
-            st.info("Using configured cloud credentials")
-        else:
-            # Locally, allow credential override
-            api_key = st.text_input("API Key", value=credentials['api_key'], type="password")
-            api_secret = st.text_input("API Secret", value=credentials['api_secret'], type="password")
-            redirect_uri = st.text_input("Redirect URI", value=credentials['redirect_uri'])
+        # Set credentials from the pre-configured values
+        api_key = credentials['api_key']
+        api_secret = credentials['api_secret']
+        redirect_uri = credentials['redirect_uri']
         
         # Analysis settings
         st.subheader("Analysis Settings")
@@ -797,39 +777,23 @@ def main():
     
     else:
         with main_content_container:
-            if is_cloud():
-                st.error("Token not available or expired. Please check your secrets.toml configuration.")
-                st.info("Make sure you have added the access_token in your Streamlit Cloud secrets.")
-                st.markdown("""
-                To configure your secrets in Streamlit Cloud:
-                1. Go to your app settings
-                2. Navigate to the Secrets section
-                3. Add your Upstox credentials in this format:
-                ```toml
-                [upstox]
-                api_key = "your_api_key"
-                api_secret = "your_api_secret"
-                redirect_uri = "your_redirect_uri"
-                access_token = "your_access_token"
-                ```
-                """)
-            else:
-                auth_url = st.session_state.upstox_api.get_auth_url(api_key, redirect_uri)
-                st.markdown(f"[Click here to authorize]({auth_url})")
-                
-                auth_code = st.text_input("Enter the authorization code:")
-                if auth_code:
-                    success, token_data = st.session_state.upstox_api.get_access_token(
-                        auth_code, api_key, api_secret, redirect_uri
-                    )
-                    if success:
-                        st.session_state.token_data = token_data
-                        st.session_state.upstox_api.access_token = token_data.get('access_token')
-                        store_token(token_data.get('access_token'))
-                        st.success("Successfully authenticated!")
-                        st.experimental_rerun()
-                    else:
-                        st.error(f"Authentication failed: {token_data}")
+            st.error("Developer access token not available or has expired.")
+            st.info("""
+            Please configure your developer credentials in .streamlit/secrets.toml with this format:
+            ```toml
+            [upstox]
+            access_token = "your_permanent_access_token"
+            api_key = "your_api_key"
+            api_secret = "your_api_secret"
+            redirect_uri = "your_redirect_uri"
+            ```
+            To get a permanent access token:
+            1. Run the app locally
+            2. Use the Upstox developer portal
+            3. Generate a permanent access token
+            4. Add it to your secrets.toml
+            """)
+            st.warning("Contact the developer if you need access to this application.")
             
             st.markdown("""
             ### Setup Guide:
