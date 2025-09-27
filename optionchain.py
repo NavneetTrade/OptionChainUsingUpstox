@@ -509,9 +509,11 @@ def main():
     st.title("Enhanced Upstox F&O Option Chain Dashboard")
     st.markdown("Advanced options data analysis with Greeks and sentiment tracking")
     
-    # Initialize session state
+    # Initialize session state with all required variables
     if 'upstox_api' not in st.session_state:
         st.session_state.upstox_api = UpstoxAPI()
+    if 'token_data' not in st.session_state:
+        st.session_state.token_data = None
     if 'selected_symbol' not in st.session_state:
         st.session_state.selected_symbol = "NIFTY"
     if 'selected_expiry' not in st.session_state:
@@ -522,6 +524,8 @@ def main():
         st.session_state.last_data_update = None
     if 'option_chain_data' not in st.session_state:
         st.session_state.option_chain_data = None
+    if 'access_token' not in st.session_state:
+        st.session_state.access_token = None
         
     # Get pre-configured developer credentials
     try:
@@ -607,27 +611,17 @@ def main():
                 st.write("Market hours: 9:15 AM - 3:30 PM (Mon-Fri)")
     
     # Token management
-    st.sidebar.subheader("Token Management")
+    st.sidebar.subheader("Token Status")
     
     if st.session_state.upstox_api.access_token:
-        st.sidebar.success("Access Token Available")
+        st.sidebar.success("✓ Connected to Upstox")
         
-        if st.session_state.token_data:
-            with st.sidebar.expander("Token Details"):
-                st.json(st.session_state.token_data)
-        
-        if st.sidebar.button("Test Token"):
+        if st.sidebar.button("Test Connection"):
             profile_data, error = st.session_state.upstox_api.get_profile()
             if profile_data:
-                st.sidebar.success("Token is valid")
-                st.sidebar.json(profile_data)
+                st.sidebar.success("✓ Connection is valid")
             else:
-                st.sidebar.error(f"Token invalid: {error}")
-        
-        if st.sidebar.button("Clear Tokens"):
-            st.session_state.upstox_api.access_token = None
-            st.session_state.upstox_api.refresh_token = None
-            st.session_state.token_data = None
+                st.sidebar.error("⚠️ Connection error: " + str(error))
             st.rerun()
     else:
         st.sidebar.warning("No Access Token")
