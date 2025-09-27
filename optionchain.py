@@ -2050,17 +2050,26 @@ def detect_gamma_blast(table, spot_price, gex_df, historical_data=None, market_c
     entry_signal = False
 
     # Get current IST time
-    from datetime import datetime
+    from datetime import datetime, time as dt_time
     import pytz
     import numpy as np
     ist = pytz.timezone('Asia/Kolkata')
     current_time_ist = datetime.now(ist)
-    current_hour_minute = current_time_ist.hour * 100 + current_time_ist.minute
     
-    # Dynamic time threshold based on market session
-    time_factor = min((current_hour_minute - 915) / (1530 - 915), 1.0)
-    entry_time_threshold = 1330 - (time_factor * 60)
-    is_entry_time = current_hour_minute >= entry_time_threshold
+    # Create time objects for comparison
+    current_time = dt_time(current_time_ist.hour, current_time_ist.minute)
+    market_open = dt_time(9, 15)
+    market_close = dt_time(15, 30)
+    entry_threshold = dt_time(13, 30)  # 1:30 PM
+    
+    # Convert times to minutes since midnight for calculations
+    current_minutes = current_time.hour * 60 + current_time.minute
+    open_minutes = market_open.hour * 60 + market_open.minute
+    close_minutes = market_close.hour * 60 + market_close.minute
+    
+    # Calculate time factor
+    time_factor = min((current_minutes - open_minutes) / (close_minutes - open_minutes), 1.0)
+    is_entry_time = current_time >= entry_threshold
     
     # 1. Find ATM strike with maximum OI (dynamic ATM definition)
     table_copy = table.copy()
@@ -2267,13 +2276,13 @@ def detect_gamma_blast(table, spot_price, gex_df, historical_data=None, market_c
         if is_entry_time:
             entry_signal = True
             signal = signal.replace("Setup", "ENTRY SIGNAL")
-            entry_hour = int(entry_time_threshold // 100)
-            entry_minute = int(entry_time_threshold % 100)
-            reasons.append(f"POST {entry_hour:02d}:{entry_minute:02d} - ENTRY CONDITIONS MET")
+            # Format time in 12-hour format with AM/PM
+            entry_time_str = entry_threshold.strftime("%I:%M %p")
+            reasons.append(f"POST {entry_time_str} - ENTRY CONDITIONS MET")
         else:
-            entry_hour = int(entry_time_threshold // 100)
-            entry_minute = int(entry_time_threshold % 100)
-            reasons.append(f"POST {entry_hour:02d}:{entry_minute:02d} - ENTRY CONDITIONS MET")
+            # Format time in 12-hour format with AM/PM
+            entry_time_str = entry_threshold.strftime("%I:%M %p")
+            reasons.append(f"POST {entry_time_str} - ENTRY CONDITIONS MET")
     elif total_score >= base_threshold:
         signal = "Gamma Blast Watch"
         direction = "MONITOR"
