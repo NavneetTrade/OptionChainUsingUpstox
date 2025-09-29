@@ -11,6 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import norm
 import os
+import toml
 
 # Optional auto-refresh
 try:
@@ -18,6 +19,31 @@ try:
     AUTORFR = True
 except ImportError:
     AUTORFR = False
+
+# Initialize Streamlit page config
+st.set_page_config(
+    page_title="Option Chain Analysis",
+    page_icon="📈",
+    layout="wide"
+)
+
+# Load secrets early to catch any issues
+if not hasattr(st, 'secrets'):
+    st.error("Streamlit secrets not initialized! Running in development mode?")
+else:
+    # Try to load secrets directly to validate
+    try:
+        secrets_path = os.path.join(os.path.dirname(__file__), '.streamlit', 'secrets.toml')
+        if os.path.exists(secrets_path):
+            with open(secrets_path) as f:
+                secrets_content = toml.load(f)
+                if 'upstox' not in secrets_content:
+                    st.error("'upstox' section not found in secrets.toml")
+                    st.error(f"Available sections: {list(secrets_content.keys())}")
+        else:
+            st.error(f"secrets.toml file not found at: {secrets_path}")
+    except Exception as e:
+        st.error(f"Error loading secrets.toml: {str(e)}")
 
 # Set up Indian timezone
 IST = pytz.timezone('Asia/Kolkata')
@@ -35,47 +61,38 @@ def format_ist_time(dt):
 
 def get_credentials():
     """Get pre-configured developer credentials"""
+    if not hasattr(st, 'secrets'):
+        st.error("st.secrets is not available. Make sure you're running this with streamlit run")
+        return None
+
+    if 'upstox' not in st.secrets:
+        st.error("'upstox' section not found in secrets.toml")
+        sections = list(st.secrets.keys()) if hasattr(st.secrets, 'keys') else []
+        st.error(f"Available sections: {sections}")
+        return None
+
     try:
-        # Check if secrets file exists
-        secrets_path = os.path.join(os.path.dirname(__file__), '.streamlit', 'secrets.toml')
-        if not os.path.exists(secrets_path):
-            st.error(f"secrets.toml file not found at: {secrets_path}")
-            return None
-            
-        # Verify secrets are loaded
-        if not hasattr(st, 'secrets'):
-            st.error("Streamlit secrets not initialized")
-            return None
-            
-        # Check if upstox section exists
-        if 'upstox' not in st.secrets:
-            st.error("'upstox' section not found in secrets.toml")
-            st.error(f"Available sections: {list(st.secrets.keys())}")
-            return None
-            
-        # Get credentials
+        # Try to access the credentials directly
+        credentials = {
+            'access_token': st.secrets.upstox.access_token,
+            'api_key': st.secrets.upstox.api_key,
+            'api_secret': st.secrets.upstox.api_secret,
+            'redirect_uri': st.secrets.upstox.redirect_uri
+        }
+        return credentials
+    except Exception as e:
+        # If dot notation fails, try dictionary access
         try:
             credentials = {
-                'access_token': st.secrets["upstox"]["access_token"],
-                'api_key': st.secrets["upstox"]["api_key"],
-                'api_secret': st.secrets["upstox"]["api_secret"],
-                'redirect_uri': st.secrets["upstox"]["redirect_uri"]
+                'access_token': st.secrets['upstox']['access_token'],
+                'api_key': st.secrets['upstox']['api_key'],
+                'api_secret': st.secrets['upstox']['api_secret'],
+                'redirect_uri': st.secrets['upstox']['redirect_uri']
             }
             return credentials
-        except KeyError as e:
-            st.error(f"Missing required credential: {str(e)}")
+        except Exception as inner_e:
+            st.error(f"Error accessing credentials: {str(inner_e)}")
             return None
-    except Exception as e:
-        st.error(f"Error getting credentials: {str(e)}")
-        return None
-        if not hasattr(st, 'secrets'):
-            st.error("st.secrets is not available. Make sure you're running this with streamlit run")
-        elif 'upstox' not in st.secrets:
-            st.error("'upstox' section not found in secrets.toml")
-            st.write("Current sections in secrets:", list(st.secrets.keys()) if hasattr(st.secrets, 'keys') else "None")
-        else:
-            st.error(f"Error loading credentials: {str(e)}")
-        return None
 
 # Upstox API endpoints
 BASE_URL = "https://api.upstox.com/v2"
