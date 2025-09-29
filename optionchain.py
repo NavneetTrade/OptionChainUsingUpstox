@@ -36,7 +36,24 @@ def format_ist_time(dt):
 def get_credentials():
     """Get pre-configured developer credentials"""
     try:
-        # First try reading directly from st.secrets
+        # Check if secrets file exists
+        secrets_path = os.path.join(os.path.dirname(__file__), '.streamlit', 'secrets.toml')
+        if not os.path.exists(secrets_path):
+            st.error(f"secrets.toml file not found at: {secrets_path}")
+            return None
+            
+        # Verify secrets are loaded
+        if not hasattr(st, 'secrets'):
+            st.error("Streamlit secrets not initialized")
+            return None
+            
+        # Check if upstox section exists
+        if 'upstox' not in st.secrets:
+            st.error("'upstox' section not found in secrets.toml")
+            st.error(f"Available sections: {list(st.secrets.keys())}")
+            return None
+            
+        # Get credentials
         try:
             credentials = {
                 'access_token': st.secrets["upstox"]["access_token"],
@@ -45,16 +62,12 @@ def get_credentials():
                 'redirect_uri': st.secrets["upstox"]["redirect_uri"]
             }
             return credentials
-        except KeyError:
-            # If the above fails, try the alternative format
-            return {
-                'access_token': st.secrets.upstox.access_token,
-                'api_key': st.secrets.upstox.api_key,
-                'api_secret': st.secrets.upstox.api_secret,
-                'redirect_uri': st.secrets.upstox.redirect_uri
-            }
+        except KeyError as e:
+            st.error(f"Missing required credential: {str(e)}")
+            return None
     except Exception as e:
-        # Log more detailed error information
+        st.error(f"Error getting credentials: {str(e)}")
+        return None
         if not hasattr(st, 'secrets'):
             st.error("st.secrets is not available. Make sure you're running this with streamlit run")
         elif 'upstox' not in st.secrets:
