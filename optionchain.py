@@ -2294,14 +2294,15 @@ def detect_gamma_blast(table, spot_price, gex_df, historical_data=None, market_c
         directional_threshold = 1.3 + (time_factor * 0.4)
         
         if ce_unwinding_strength > pe_unwinding_strength * directional_threshold:
+            direction = "DOWNSIDE_BREAKOUT"
+            signal = "Gamma Blast Setup - Downside"
+        elif pe_unwinding_strength > ce_unwinding_strength * directional_threshold:
             direction = "UPSIDE_BREAKOUT"
             signal = "Gamma Blast Setup - Upside"
-        elif pe_unwinding_strength > ce_unwinding_strength * directional_threshold:
-            direction = "DOWNSIDE_BREAKOUT"  
-            signal = "Gamma Blast Setup - Downside"
         else:
             direction = "BIDIRECTIONAL"
             signal = "Gamma Blast Setup - Bidirectional"
+
         
         if is_entry_time:
             entry_signal = True
