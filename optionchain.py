@@ -1058,7 +1058,25 @@ def display_option_chain_dashboard(data, symbol, expiry, itm_count, risk_free_ra
         bucket_summary = calculate_bucket_summaries(filtered_table, atm_strike, spot_price)
         pcr_data = calculate_comprehensive_pcr(bucket_summary)
         
-        display_bucket_summaries(bucket_summary, pcr_data)
+        # Get gamma blast signal first
+        gamma_blast_info = None
+        if 'current_gex_data' in st.session_state:
+            try:
+                gex_df = pd.DataFrame(st.session_state.current_gex_data)
+                market_context = {'regime': calculate_market_regime(None, gex_df, filtered_table)}
+                blast_signal, blast_direction, reasons, entry_signal, _ = detect_gamma_blast(
+                    filtered_table, spot_price, gex_df, None, market_context
+                )
+                gamma_blast_info = {
+                    'signal': blast_signal,
+                    'direction': blast_direction,
+                    'reasons': reasons,
+                    'entry_signal': entry_signal
+                }
+            except Exception as e:
+                st.error(f"Error getting gamma blast signal: {str(e)}")
+        
+        display_bucket_summaries(bucket_summary, pcr_data, gamma_blast_info)
         
         sentiment_analysis = calculate_comprehensive_sentiment_score(filtered_table, bucket_summary, pcr_data, spot_price)
         display_sentiment_analysis(sentiment_analysis, symbol)
@@ -1336,8 +1354,8 @@ def get_pcr_color(pcr_value):
     else:
         return "#ff9800"  # Orange - Neutral
 
-def display_bucket_summaries(bucket_summary, pcr_data):
-    """Display bucket summaries with enhanced color coding"""
+def display_bucket_summaries(bucket_summary, pcr_data, gamma_blast_info=None):
+    """Display bucket summaries with enhanced color coding and gamma blast signals"""
     st.subheader("Bucket Summaries with Greeks Analysis")
     
     left, middle, right = st.columns([1, 1, 1])
@@ -1362,6 +1380,28 @@ def display_bucket_summaries(bucket_summary, pcr_data):
             </div>
         </div>
         """
+        
+    # Display Gamma Blast Signal if available
+    if gamma_blast_info and 'signal' in gamma_blast_info:
+        signal_colors = {
+            "Gamma Blast ENTRY SIGNAL - Upside": "#059669",
+            "Gamma Blast ENTRY SIGNAL - Downside": "#dc2626",
+            "Gamma Blast ENTRY SIGNAL - Bidirectional": "#7c3aed"
+        }
+        color = signal_colors.get(gamma_blast_info['signal'], "#6b7280")
+        
+        st.markdown(f"""
+        <div style="background: linear-gradient(90deg, {color}15, transparent); 
+             padding: 10px; border-radius: 8px; border-left: 4px solid {color}; 
+             margin-bottom: 10px;">
+            <div style="color: {color}; font-weight: bold;">
+                {gamma_blast_info['signal']}
+            </div>
+            <div style="font-size: 0.9em;">
+                Direction: {gamma_blast_info.get('direction', 'NEUTRAL')}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     def display_pcr_metric(label, value, signal=""):
         pcr_color = get_pcr_color(value)
