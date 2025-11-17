@@ -631,7 +631,7 @@ def main():
         
         # Analysis settings
         st.subheader("Analysis Settings")
-        itm_count = st.radio("ITM Strikes", [3, 5], index=1, key="itm_count_radio")
+        itm_count = st.radio("ITM Strikes", [1, 2, 3, 5], index=2, key="itm_count_radio")
         risk_free_rate = st.number_input("Risk-free Rate (%)", value=5.84, min_value=0.0, max_value=15.0, step=0.1) / 100
         
         # Auto-refresh settings
