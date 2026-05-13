@@ -1734,13 +1734,13 @@ def display_option_chain_table(table, atm_strike, spot_price):
     # Style the dataframe
     styled_df = (display_df.style
         # Color code changes
-        .applymap(
+        .map(
             lambda x: ('color: #4caf50' if isinstance(x, str) and x.startswith('+') else 
                       'color: #f44336' if isinstance(x, str) and x.startswith('-') else ''),
             subset=[col for col in change_cols if col in display_df.columns]
         )
         # Highlight positions
-        .applymap(highlight_option_position, subset=[col for col in ['CE_Position', 'PE_Position'] if col in display_df.columns])
+        .map(highlight_option_position, subset=[col for col in ['CE_Position', 'PE_Position'] if col in display_df.columns])
         # Highlight ATM strike
         .apply(highlight_atm, axis=1)
         # Alternate row colors for non-ATM rows
@@ -1764,13 +1764,13 @@ def display_option_chain_table(table, atm_strike, spot_price):
     # Create fresh styling for the cleaned DataFrame
     styled_df = (display_df.style
         # Color code changes
-        .applymap(
+        .map(
             lambda x: ('color: #4caf50' if isinstance(x, str) and x.startswith('+') else 
                       'color: #f44336' if isinstance(x, str) and x.startswith('-') else ''),
             subset=[col for col in change_cols if col in display_df.columns]
         )
         # Highlight positions
-        .applymap(highlight_option_position, subset=[col for col in ['CE_Position', 'PE_Position'] if col in display_df.columns])
+        .map(highlight_option_position, subset=[col for col in ['CE_Position', 'PE_Position'] if col in display_df.columns])
         # Highlight ATM strike
         .apply(highlight_atm, axis=1)
         # Alternate row colors for non-ATM rows
@@ -2601,7 +2601,7 @@ def calculate_put_call_parity_analysis(table, atm_strike):
             else:
                 return 'background-color: #fff9c4; color: #f57f17'
 
-        styled = parity_df.style.applymap(highlight_mispricing, subset=['Mispricing'])
+        styled = parity_df.style.map(highlight_mispricing, subset=['Mispricing'])
         st.dataframe(styled, use_container_width=True)
     else:
         st.warning("No equidistant OTM pairs found for parity analysis.")
